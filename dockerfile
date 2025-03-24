@@ -11,7 +11,8 @@ RUN yum -y update && \
     yum install -y java-1.8.0-openjdk httpd zip unzip
 
 # Download and set up the website template
-RUN wget -O /tmp/photogenic.zip https://www.free-css.com/assets/files/free-css-templates/download/page254/photogenic.zip && \
+RUN yum install -y wget && \
+wget -O /tmp/photogenic.zip https://www.free-css.com/assets/files/free-css-templates/download/page254/photogenic.zip && \
 mv /tmp/photogenic.zip /var/www/html/
 
 
