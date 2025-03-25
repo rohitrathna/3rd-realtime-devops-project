@@ -13,7 +13,7 @@ node {
         sshagent(['Ansible_user']) {
             sh '''
                 ssh -o StrictHostKeyChecking=no ubuntu@172.31.4.23 "cd /home/ubuntu/ && \
-                echo 'Checking dockerfile...' && ls -l dockerfile && \
+                echo 'Checking Dockerfile...' && ls -l Dockerfile && \
                 echo 'Building Docker image...' && sudo docker build -t pipeline-demo:V1.${BUILD_ID} . && \
                 sudo docker images | grep pipeline-demo"
             '''
