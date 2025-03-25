@@ -1,4 +1,4 @@
-kind: Deployment
+kind: deployment
 apiVersion: apps/v1
 metadata:
   name: mrdevops
