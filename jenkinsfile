@@ -1,0 +1,71 @@
+node {
+    stage('Git checkout') {
+        git branch: 'main', url: 'https://github.com/rohitrathna/3rd-realtime-devops-project.git'
+    }
+
+    stage('Sending files to Ansible server via SSH') {
+        sshagent(['Ansible_user']) {
+            sh 'scp -o StrictHostKeyChecking=no -r /var/lib/jenkins/workspace/Pipeline-demo/* ubuntu@172.31.4.23:/home/ubuntu/'
+        }
+    }
+
+    stage('Docker Build Image') {
+        sshagent(['Ansible_user']) {
+            sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.4.23 "cd /home/ubuntu/ && \
+                echo 'Checking dockerfile...' && ls -l dockerfile && \
+                echo 'Building Docker image...' && sudo docker build -t pipeline-demo:V1.${BUILD_ID} . && \
+                sudo docker images | grep pipeline-demo"
+            '''
+        }
+    }
+
+    stage('Docker Image Tagging') {
+        sshagent(['Ansible_user']) {
+            sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.4.23 "if sudo docker images | grep -q 'pipeline-demo'; then \
+                echo 'Tagging image...' && \
+                sudo docker tag pipeline-demo:V1.${BUILD_ID} sunrise568/pipeline-demo:V1.${BUILD_ID} && \
+                sudo docker tag pipeline-demo:V1.${BUILD_ID} sunrise568/pipeline-demo:latest; \
+                else echo 'Error: Image not found!' && exit 1; fi"
+            '''
+        }
+    }
+
+    stage('Push Docker Images to Docker Hub') {
+        sshagent(['Ansible_user']) {
+            withCredentials([string(credentialsId: 'dockerhub_passwd', variable: 'dockerhub_passwd')]) {
+                sh '''
+                    ssh -o StrictHostKeyChecking=no ubuntu@172.31.4.23 "echo '${dockerhub_passwd}' | sudo docker login -u sunrise568 --password-stdin && \
+                    sudo docker push sunrise568/pipeline-demo:V1.${BUILD_ID} && \
+                    sudo docker push sunrise568/pipeline-demo:latest"
+                '''
+            }
+        }
+    }
+
+    stage('Copy Files from Ansible to Kubernetes Server') {
+        sshagent(['Ansible_user']) {
+            sh '''
+                echo "Copying deployment files to Kubernetes server..."
+                scp -o StrictHostKeyChecking=no ubuntu@172.31.4.23:/home/ubuntu/deployment.yaml ubuntu@172.31.33.178:/home/ubuntu/
+            '''  
+        }
+    }
+
+    stage('Kubernetes Deployment using Ansible') {
+        sshagent(['Ansible_user']) {
+            sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.4.23 "cd /home/ubuntu/ && ansible-playbook ansible.yaml"
+            '''
+        }
+    }
+
+    stage('Apply Kubernetes Deployment') {
+        sshagent(['Ansible_user']) {
+            sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.33.178 "kubectl apply -f /home/ubuntu/deployment.yaml"
+            '''
+        }
+    }
+}
